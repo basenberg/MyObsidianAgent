@@ -1,101 +1,128 @@
-# FastAPI + PostgreSQL Template
+# Paddy — Obsidian AI Agent
 
-Production-ready FastAPI template with vertical slice architecture, optimized for AI-assisted development.
+A locally-hosted AI agent that connects to your Obsidian vault via natural language. Interact through the Obsidian Copilot chat panel — Paddy reads, writes, searches, and manages your notes and tasks on your behalf.
 
-**Zero config • Type-safe • AI-coding-optimized**
+**Local • Private • No database**
+
+## How It Works
+
+```
+[You — typing in Obsidian Copilot]
+  ↓ natural language
+[Obsidian Copilot Plugin]        ← chat UI inside Obsidian
+  ↓ POST /v1/chat/completions
+[Paddy — FastAPI on localhost:8000]
+  ↓ Pydantic AI Agent + Claude
+[Obsidian Local REST API Plugin] ← vault access (localhost:27124)
+  ↓
+[Your Obsidian Vault — Markdown files]
+```
 
 ## Quick Start
 
 ```bash
-# 1. Use this template (GitHub) or clone
-git clone <your-repo>
-cd <your-project>
-
-# 2. Install dependencies
+# 1. Clone and install
+git clone https://github.com/basenberg/MyObsidianAgent.git
+cd dynamous-community\MyObsidianAgent
 uv sync
 
-# 3. Start services
-docker-compose up -d
+# 2. Configure environment
+cp .env.example .env
+# Edit .env — add ANTHROPIC_API_KEY, OBSIDIAN_API_KEY, OBSIDIAN_VAULT_PATH
 
-# 4. Run migrations
-uv run alembic upgrade head
+# 3. Start Obsidian with Local REST API plugin active
 
-# 5. Start development
-uv run uvicorn app.main:app --reload --port 8123
+# 4. Run Paddy
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Visit `http://localhost:8123/docs` for Swagger UI.
+Point Obsidian Copilot's base URL at `http://localhost:8000` and start chatting.
 
-## What's Inside
+## Prerequisites
 
-**Core Infrastructure**
+**Obsidian Plugins (required):**
 
-- FastAPI with async/await
-- PostgreSQL (Docker/Supabase/Neon/Railway)
-- SQLAlchemy + Alembic migrations
-- Pydantic settings with .env support
+| Plugin | Purpose |
+|---|---|
+| [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) | Exposes vault over HTTPS on `localhost:27124` |
+| [Obsidian Copilot](https://github.com/logancyang/obsidian-copilot) | Chat UI — set base URL to `http://localhost:8000` |
+| Periodic Notes or Daily Notes | Required for daily/weekly/monthly note access |
 
-**Developer Experience**
+**System:**
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/) package manager
+- Anthropic API key
 
-- Strict type checking (MyPy + Pyright)
-- Ruff linting & formatting
-- Structured logging with request correlation
-- Health check endpoints
-- Docker multi-stage builds
+## What You Can Ask
 
-**AI Optimization**
+**Tasks**
+> "What tasks do I have open in my project notes?"
+> "Mark the API design task as complete in my Sprint notes."
+> "Add a task to follow up with the client under Action Items."
 
-- Grep-able event logging
-- Consistent naming patterns
-- Shared utilities (pagination, timestamps)
-- Self-correcting feedback loops
+**Notes**
+> "Create a new project note for Project X with a standard template."
+> "What did I write in my weekly note this week?"
+> "Search my vault for everything related to the Acme project."
+
+**Navigation**
+> "List everything in my Projects folder."
+> "Find all notes that mention the word 'deadline'."
+> "Read my daily note for today."
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Agent framework | [Pydantic AI](https://ai.pydantic.dev/) |
+| API framework | FastAPI |
+| LLM | Claude (Anthropic API) |
+| Vault access | Obsidian Local REST API (httpx) |
+| Package manager | UV (Astral) |
+| Runtime | Python 3.12+ |
 
 ## Project Structure
 
 ```
 app/
-├── core/           # Infrastructure (config, database, logging, middleware)
-├── shared/         # Cross-feature utilities (pagination, timestamps)
-├── examples/       # Example feature slice (delete in your project)
-└── main.py         # FastAPI application
+├── core/
+│   ├── config.py           # Settings: vault path, API keys, LLM model
+│   ├── agent.py            # Agent factory: assembles tools → Agent
+│   ├── obsidian_client.py  # httpx.AsyncClient for Obsidian Local REST API
+│   ├── logging.py          # Structlog setup
+│   └── deps.py             # AgentDeps dataclass
+├── shared/
+│   └── openai_schema.py    # OpenAI-compatible request/response models
+├── features/
+│   ├── chat/               # POST /v1/chat/completions
+│   ├── notes/              # Read, write, update notes
+│   ├── folders/            # List, create folders
+│   ├── search/             # Full-text vault search
+│   ├── periodic/           # Daily/weekly/monthly notes
+│   └── tasks/              # View, add, complete tasks
+└── main.py
 ```
 
-## Customization
+## Environment Variables
 
-1. Update `name` in `pyproject.toml`
-2. Update `APP_NAME` in `.env.example`
-3. Copy `.env.example` to `.env`
-4. Update database name/credentials
-5. Delete `app/examples/` (demo feature)
-6. Build your first feature slice
-
-## Database Providers
-
-Works with any PostgreSQL provider:
-
-```bash
-# Docker (default)
-DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5433/mydb
-
-# Supabase
-DATABASE_URL=postgresql+asyncpg://postgres:[PASSWORD]@db.[REF].supabase.co:5432/postgres
-
-# Neon
-DATABASE_URL=postgresql+asyncpg://[USER]:[PASSWORD]@[HOST].neon.tech/[DB]?sslmode=require
-
-# Railway
-DATABASE_URL=postgresql+asyncpg://postgres:[PASSWORD]@[HOST].railway.app:[PORT]/railway
-```
+| Variable | Description |
+|---|---|
+| `ANTHROPIC_API_KEY` | Anthropic API key for Claude |
+| `OBSIDIAN_API_KEY` | Bearer token from Local REST API plugin settings |
+| `OBSIDIAN_VAULT_PATH` | Absolute path to your Obsidian vault |
+| `OBSIDIAN_API_URL` | Local REST API base URL (default: `https://localhost:27124`) |
+| `LLM_MODEL` | Claude model ID (default: `claude-sonnet-4-6`) |
 
 ## Commands
 
 ```bash
 # Development
-uv run uvicorn app.main:app --reload --port 8123
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 # Testing
-uv run pytest -v                    # All tests
-uv run pytest -v -m integration     # Integration tests only
+uv run pytest -v                  # all tests
+uv run pytest -v -m unit          # unit only
+uv run pytest -v -m integration   # integration (Obsidian must be running)
 
 # Type checking
 uv run mypy app/
@@ -104,82 +131,24 @@ uv run pyright app/
 # Linting
 uv run ruff check .
 uv run ruff format .
-
-# Database
-uv run alembic revision --autogenerate -m "description"
-uv run alembic upgrade head
-uv run alembic downgrade -1
-
-# Docker
-docker-compose up -d                # Start services
-docker-compose logs -f app          # View logs
-docker-compose down                 # Stop services
 ```
 
-## Slash Commands
+## MVP Tool Set
 
-Built-in Claude Code commands:
+All tools are prefixed `obsidian_` with unambiguous parameter names.
 
-- `/commit` - Create atomic commits with proper messages
-- `/validate` - Run full validation suite (tests, types, linting, docker)
-- `/check-ignore-comments` - Analyze type suppressions
-
-## Features
-
-- Type safety: Strict mode, zero suppressions
-- Testing: 34 tests, <0.3s execution
-- Logging: JSON structured, request correlation
-- CORS: Configured for local development
-- Migrations: Alembic with async support
-- Health checks: `/health`, `/health/db`, `/health/ready`
-- Docker: Multi-stage builds, hot reload
-- Pagination: Shared utilities, consistent patterns
-- Timestamps: Automatic tracking on all models
-
-## Architecture Principles
-
-**Vertical Slice**
-
-- Features own their database models, logic, and routes
-- Core infrastructure (config, database, logging) is shared
-- Shared utilities extracted when used by 3+ features
-
-**AI-Friendly**
-
-- Grep-able structured logging: `logger.info("feature.action.status")`
-- Type hints everywhere: AI understands contracts
-- Consistent patterns: Predictable code generation
-- Fast feedback: Linting/typing catches errors immediately
-
-## Tech Stack
-
-**Backend**
-
-- Python 3.12+
-- FastAPI 0.120+
-- SQLAlchemy 2.0+ (async)
-- Pydantic 2.0+
-
-**Database**
-
-- PostgreSQL 18 (any provider)
-- Alembic migrations
-- asyncpg driver
-
-**Dev Tools**
-
-- uv (package manager)
-- Ruff (linting/formatting)
-- MyPy + Pyright (type checking)
-- pytest (testing)
-- Docker + Docker Compose
-
-## Requirements
-
-- Python 3.12+
-- uv (or pip)
-- Docker + Docker Compose
-- PostgreSQL 18+ (via Docker or cloud provider)
+| Tool | Purpose |
+|---|---|
+| `obsidian_read_note` | Read full note content |
+| `obsidian_write_note` | Create or overwrite a note |
+| `obsidian_update_note` | Append/prepend, optionally scoped to a heading |
+| `obsidian_list_folder` | List folder contents |
+| `obsidian_create_folder` | Create a new folder |
+| `obsidian_search_vault` | Full-text search across all notes |
+| `obsidian_get_periodic_note` | Get current daily/weekly/monthly note |
+| `obsidian_get_tasks` | Extract structured task list from a note |
+| `obsidian_add_task` | Add a task, optionally under a heading |
+| `obsidian_complete_task` | Mark a matching task as complete |
 
 ## License
 
