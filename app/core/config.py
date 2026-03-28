@@ -4,12 +4,15 @@ This module provides centralized configuration management:
 - Environment variable loading from .env file
 - Type-safe settings with validation
 - Cached settings instance with @lru_cache
-- Settings for application, CORS, and future database configuration
+- Settings for application, LLM, auth, CORS, and optional database configuration
 """
 
 from functools import lru_cache
 
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+load_dotenv()
 
 
 class Settings(BaseSettings):
@@ -35,8 +38,16 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     api_prefix: str = "/api"
 
-    # Database
-    database_url: str
+    # LLM configuration
+    llm_provider: str = "anthropic"
+    llm_model: str = "claude-haiku-4-5-20251001"
+    llm_api_key: str = ""
+
+    # API authentication
+    api_key: str = ""
+
+    # Database — optional, not required for agent-only deployments
+    database_url: str = ""
 
     # CORS settings
     allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:8123"]
@@ -52,9 +63,4 @@ def get_settings() -> Settings:
     Returns:
         The application settings instance.
     """
-    # pydantic-settings automatically loads required fields (like database_url)
-    # from environment variables at runtime. Mypy's static analysis doesn't understand
-    # this behavior and expects all required fields as constructor arguments. This is
-    # a known limitation of mypy with pydantic-settings. The call-arg error is suppressed
-    # as the runtime behavior is correct and type-safe.
-    return Settings()  # type: ignore[call-arg]
+    return Settings()

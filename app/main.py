@@ -5,10 +5,10 @@ This module creates and configures the FastAPI application with:
 - Structured logging setup
 - Request/response middleware
 - CORS support
-- Database connection management
+- Optional database connection management
 - Health check endpoints
 - Global exception handlers
-- Root API endpoint
+- OpenAI-compatible chat endpoint
 """
 
 from collections.abc import AsyncIterator
@@ -23,6 +23,7 @@ from app.core.exceptions import setup_exception_handlers
 from app.core.health import router as health_router
 from app.core.logging import get_logger, setup_logging
 from app.core.middleware import setup_middleware
+from app.features.chat import routes as chat_routes
 
 settings = get_settings()
 
@@ -32,8 +33,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan event handler.
 
     Handles startup and shutdown logic:
-    - Startup: Configure logging, initialize database connection, log application start
-    - Shutdown: Dispose database connections, log application shutdown
+    - Startup: Configure logging, log application start
+    - Shutdown: Dispose database connections if configured, log shutdown
 
     Args:
         _app: The FastAPI application instance (unused, required by protocol).
@@ -50,13 +51,15 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         version=settings.version,
         environment=settings.environment,
     )
-    logger.info("database.connection_initialized")
+    if settings.database_url:
+        logger.info("database.connection_initialized")
 
     yield
 
     # Shutdown
-    await engine.dispose()
-    logger.info("database.connection_closed")
+    if settings.database_url:
+        await engine.dispose()
+        logger.info("database.connection_closed")
     logger.info("application.lifecycle_stopped", app_name=settings.app_name)
 
 
@@ -75,6 +78,7 @@ setup_exception_handlers(app)
 
 # Include routers
 app.include_router(health_router)
+app.include_router(chat_routes.router)
 
 
 @app.get("/")

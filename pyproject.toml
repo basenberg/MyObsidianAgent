@@ -6,8 +6,10 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.17.1",
+    "anthropic>=0.86.0",
     "asyncpg>=0.30.0",
     "fastapi>=0.120.1",
+    "pydantic-ai>=1.73.0",
     "pydantic-settings>=2.11.0",
     "python-dotenv>=1.2.1",
     "sqlalchemy[asyncio]>=2.0.44",
@@ -66,6 +68,7 @@ ignore = [
 "__init__.py" = ["F401"]  # Allow unused imports in package init
 "scripts/**/*.py" = ["T201"]  # Allow print in scripts
 "app/core/health.py" = ["B008"]  # FastAPI Depends() in defaults is the recommended pattern
+"app/features/chat/routes.py" = ["B008"]  # FastAPI Depends() in defaults is the recommended pattern
 
 [tool.ruff.format]
 quote-style = "double"
@@ -92,15 +95,13 @@ disallow_untyped_decorators = false
 module = "*.tests.*"
 disallow_untyped_defs = false
 
-[[tool.mypy.overrides]]
-module = "test_*"
-disallow_untyped_defs = false
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"  # Creates new event loop per test (proper isolation)
 testpaths = ["app", "tests"]
 markers = [
     "integration: marks tests requiring real database (deselect with '-m \"not integration\"')",
+    "unit: marks fast isolated unit tests with no external dependencies",
 ]
 
 [tool.pyright]

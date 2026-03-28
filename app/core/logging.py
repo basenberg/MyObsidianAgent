@@ -53,9 +53,7 @@ def set_request_id(request_id: str | None = None) -> str:
     return request_id
 
 
-def add_request_id(
-    _logger: WrappedLogger, _method_name: str, event_dict: EventDict
-) -> EventDict:
+def add_request_id(_logger: WrappedLogger, _method_name: str, event_dict: EventDict) -> EventDict:
     """Processor to add request ID to all log entries.
 
     Args:
