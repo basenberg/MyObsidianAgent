@@ -1,0 +1,61 @@
+# Virtual environments
+.venv
+venv
+env
+
+# Cache directories
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.pyright
+__pycache__
+
+# Python bytecode
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Testing and coverage
+.coverage
+htmlcov
+.tox
+
+# Build artifacts
+dist
+build
+*.egg-info
+
+# macOS
+.DS_Store
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+
+# Claude Code specific
+.claude
+.agents

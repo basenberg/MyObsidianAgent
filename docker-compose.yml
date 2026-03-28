@@ -1,0 +1,76 @@
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: obsidian_db
+    ports:
+      # Use port 5433 on host to avoid conflicts with local PostgreSQL on standard port 5432
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    # Port mapping
+    ports:
+      - "8123:8123"
+
+    # Volume mounts for development
+    # Sync project files but preserve container's .venv
+    volumes:
+      - .:/app
+      - /app/.venv  # Anonymous volume to preserve container's virtual environment
+
+    # Environment variables
+    # Load from .env file if present (create one if you need custom values)
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      # Override DATABASE_URL for Docker networking (app -> db service)
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/obsidian_db
+
+    # Wait for database to be healthy before starting app
+    depends_on:
+      db:
+        condition: service_healthy
+
+    # Development configuration
+    # Uncomment for watch mode (requires Docker Compose 2.22+)
+    # develop:
+    #   watch:
+    #     - action: sync
+    #       path: .
+    #       target: /app
+    #       ignore:
+    #         - .venv/
+    #     - action: rebuild
+    #       path: ./pyproject.toml
+
+    # Optional: Add health check
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:8123/health"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 40s
+
+    # Restart policy
+    restart: unless-stopped
+
+# Named volumes for data persistence
+volumes:
+  postgres_data:
