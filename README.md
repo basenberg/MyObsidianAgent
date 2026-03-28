@@ -1,19 +1,19 @@
 # Paddy — Obsidian AI Agent
 
-A locally-hosted AI agent that connects to your Obsidian vault via natural language. Interact through the Obsidian Copilot chat panel — Paddy reads, writes, searches, and manages your notes and tasks on your behalf.
+A self-hosted AI agent that lets you interact with your Obsidian vault using natural language. Chat through the Obsidian Copilot plugin — Paddy reads, writes, searches, and manages your notes on your behalf.
 
-**Local • Private • No database**
+**Local • Private • Provider-agnostic • No database**
 
 ## How It Works
 
 ```
 [You — typing in Obsidian Copilot]
   ↓ natural language
-[Obsidian Copilot Plugin]        ← chat UI inside Obsidian
+[Obsidian Copilot Plugin]            ← chat UI inside Obsidian
   ↓ POST /v1/chat/completions
-[Paddy — FastAPI on localhost:8000]
-  ↓ Pydantic AI Agent + Claude
-[Obsidian Local REST API Plugin] ← vault access (localhost:27124)
+[Paddy — FastAPI in Docker :8000]
+  ↓ Pydantic AI Agent + LLM
+[/vault — Docker volume mount]       ← direct file system, read-write
   ↓
 [Your Obsidian Vault — Markdown files]
 ```
@@ -21,22 +21,23 @@ A locally-hosted AI agent that connects to your Obsidian vault via natural langu
 ## Quick Start
 
 ```bash
-# 1. Clone and install
+# 1. Clone and configure
 git clone https://github.com/basenberg/MyObsidianAgent.git
-cd dynamous-community\MyObsidianAgent
-uv sync
-
-# 2. Configure environment
+cd MyObsidianAgent
 cp .env.example .env
-# Edit .env — add ANTHROPIC_API_KEY, OBSIDIAN_API_KEY, OBSIDIAN_VAULT_PATH
+# Edit .env — set LLM_PROVIDER, LLM_MODEL, LLM_API_KEY, OBSIDIAN_VAULT_PATH, API_KEY
 
-# 3. Start Obsidian with Local REST API plugin active
-
-# 4. Run Paddy
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+# 2. Start Paddy
+docker compose up
 ```
 
 Point Obsidian Copilot's base URL at `http://localhost:8000` and start chatting.
+
+**Local dev (without Docker):**
+```bash
+uv sync
+uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
 
 ## Prerequisites
 
@@ -44,31 +45,30 @@ Point Obsidian Copilot's base URL at `http://localhost:8000` and start chatting.
 
 | Plugin | Purpose |
 |---|---|
-| [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) | Exposes vault over HTTPS on `localhost:27124` |
 | [Obsidian Copilot](https://github.com/logancyang/obsidian-copilot) | Chat UI — set base URL to `http://localhost:8000` |
 | Periodic Notes or Daily Notes | Required for daily/weekly/monthly note access |
 
 **System:**
-- Python 3.12+
-- [uv](https://docs.astral.sh/uv/) package manager
-- Anthropic API key
+- [Docker](https://docs.docker.com/get-docker/) + Docker Compose
+- Python 3.11+ and [uv](https://docs.astral.sh/uv/) (local dev only)
+- API key for your chosen LLM provider
 
 ## What You Can Ask
 
-**Tasks**
-> "What tasks do I have open in my project notes?"
-> "Mark the API design task as complete in my Sprint notes."
-> "Add a task to follow up with the client under Action Items."
-
-**Notes**
-> "Create a new project note for Project X with a standard template."
-> "What did I write in my weekly note this week?"
-> "Search my vault for everything related to the Acme project."
-
-**Navigation**
+**Search & Discovery**
+> "Find my notes about Python from last month."
 > "List everything in my Projects folder."
-> "Find all notes that mention the word 'deadline'."
-> "Read my daily note for today."
+> "Find all notes tagged #active."
+
+**Reading with Context**
+> "Read my architecture decision note and show me related documents."
+> "What did I write in my weekly note this week?"
+> "Show me today's daily note and all backlinks to it."
+
+**Creating & Managing**
+> "Create a new project note for Project X with sections for goals, timeline, and team."
+> "Move all meeting notes from last quarter to the archive folder."
+> "Tag all notes in the Projects folder with 'active' and add a status field."
 
 ## Tech Stack
 
@@ -76,79 +76,82 @@ Point Obsidian Copilot's base URL at `http://localhost:8000` and start chatting.
 |---|---|
 | Agent framework | [Pydantic AI](https://ai.pydantic.dev/) |
 | API framework | FastAPI |
-| LLM | Claude (Anthropic API) |
-| Vault access | Obsidian Local REST API (httpx) |
+| LLM | Provider-agnostic: Anthropic, OpenAI, Google, Ollama |
+| Vault access | Docker volume mount (direct file system) |
 | Package manager | UV (Astral) |
-| Runtime | Python 3.12+ |
+| Deployment | Docker + Docker Compose |
+| Runtime | Python 3.11+ |
 
 ## Project Structure
 
 ```
-app/
+project-root/
+├── main.py                 # FastAPI entry point
 ├── core/
-│   ├── config.py           # Settings: vault path, API keys, LLM model
-│   ├── agent.py            # Agent factory: assembles tools → Agent
-│   ├── obsidian_client.py  # httpx.AsyncClient for Obsidian Local REST API
-│   ├── logging.py          # Structlog setup
-│   └── deps.py             # AgentDeps dataclass
+│   ├── agent.py            # Single Pydantic AI agent (vault_agent)
+│   ├── config.py           # Settings (pydantic-settings)
+│   ├── dependencies.py     # VaultDependencies dataclass
+│   └── lifespan.py         # FastAPI startup/shutdown
 ├── shared/
-│   └── openai_schema.py    # OpenAI-compatible request/response models
-├── features/
-│   ├── chat/               # POST /v1/chat/completions
-│   ├── notes/              # Read, write, update notes
-│   ├── folders/            # List, create folders
-│   ├── search/             # Full-text vault search
-│   ├── periodic/           # Daily/weekly/monthly notes
-│   └── tasks/              # View, add, complete tasks
-└── main.py
+│   ├── vault/
+│   │   ├── manager.py      # VaultManager: all file system operations
+│   │   └── models.py       # Vault domain models
+│   └── openai_adapter.py   # OpenAI format conversion
+└── features/
+    ├── chat/               # POST /v1/chat/completions
+    ├── vault_query/        # obsidian_query_vault tool
+    ├── vault_context/      # obsidian_get_context tool
+    └── vault_management/   # obsidian_vault_manager tool
 ```
 
 ## Environment Variables
 
 | Variable | Description |
 |---|---|
-| `ANTHROPIC_API_KEY` | Anthropic API key for Claude |
-| `OBSIDIAN_API_KEY` | Bearer token from Local REST API plugin settings |
-| `OBSIDIAN_VAULT_PATH` | Absolute path to your Obsidian vault |
-| `OBSIDIAN_API_URL` | Local REST API base URL (default: `https://localhost:27124`) |
-| `LLM_MODEL` | Claude model ID (default: `claude-sonnet-4-6`) |
+| `LLM_PROVIDER` | LLM provider: `anthropic`, `openai`, `google`, `ollama` |
+| `LLM_MODEL` | Model identifier (e.g. `claude-sonnet-4-6`, `gpt-4o`) |
+| `LLM_API_KEY` | API key for your chosen provider |
+| `OBSIDIAN_VAULT_PATH` | Absolute path to your Obsidian vault on the host |
+| `API_KEY` | Bearer token for Obsidian Copilot authentication |
+| `API_HOST` | Host to bind (default: `0.0.0.0`) |
+| `API_PORT` | Port to bind (default: `8000`) |
+| `ALLOWED_ORIGINS` | CORS origins (default: `app://obsidian.md,capacitor://localhost`) |
+
+Docker Compose mounts `OBSIDIAN_VAULT_PATH` as `/vault` inside the container automatically.
 
 ## Commands
 
 ```bash
-# Development
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+# Docker (recommended)
+docker compose up
+docker compose up --build   # rebuild after dependency changes
+
+# Local development
+uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 # Testing
 uv run pytest -v                  # all tests
 uv run pytest -v -m unit          # unit only
-uv run pytest -v -m integration   # integration (Obsidian must be running)
+uv run pytest -v -m integration   # integration (vault must be mounted at /vault)
 
 # Type checking
-uv run mypy app/
-uv run pyright app/
+uv run mypy .
+uv run pyright .
 
 # Linting
 uv run ruff check .
 uv run ruff format .
 ```
 
-## MVP Tool Set
+## Tools
 
-All tools are prefixed `obsidian_` with unambiguous parameter names.
+Paddy exposes **3 consolidated tools** following Anthropic's "fewer, smarter tools" principle:
 
 | Tool | Purpose |
 |---|---|
-| `obsidian_read_note` | Read full note content |
-| `obsidian_write_note` | Create or overwrite a note |
-| `obsidian_update_note` | Append/prepend, optionally scoped to a heading |
-| `obsidian_list_folder` | List folder contents |
-| `obsidian_create_folder` | Create a new folder |
-| `obsidian_search_vault` | Full-text search across all notes |
-| `obsidian_get_periodic_note` | Get current daily/weekly/monthly note |
-| `obsidian_get_tasks` | Extract structured task list from a note |
-| `obsidian_add_task` | Add a task, optionally under a heading |
-| `obsidian_complete_task` | Mark a matching task as complete |
+| `obsidian_query_vault` | All discovery, search, and listing (read-only). Supports semantic search, tag/date filtering, folder listing, recent changes, and related note discovery. Token-efficient with `response_format` parameter. |
+| `obsidian_get_context` | Workflow-oriented reading. Read single or multiple notes with metadata, backlinks, and related notes compiled for synthesis tasks. |
+| `obsidian_vault_manager` | All modification operations: create/update/append/delete/move notes, folder management, and bulk operations (tag, move, update metadata across multiple notes). |
 
 ## License
 
