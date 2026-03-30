@@ -24,6 +24,7 @@ services:
 
     # Port mapping
     ports:
+      - "8000:8123"
       - "8123:8123"
 
     # Volume mounts for development
@@ -31,6 +32,7 @@ services:
     volumes:
       - .:/app
       - /app/.venv  # Anonymous volume to preserve container's virtual environment
+      - ${VAULT_PATH:-/tmp/empty-vault}:/vault:ro  # Obsidian vault (set VAULT_PATH in .env)
 
     # Environment variables
     # Load from .env file if present (create one if you need custom values)
@@ -42,6 +44,8 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       # Override DATABASE_URL for Docker networking (app -> db service)
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/obsidian_db
+      # Vault is always at /vault inside the container (mounted from VAULT_PATH on host)
+      - VAULT_PATH=/vault
 
     # Wait for database to be healthy before starting app
     depends_on:

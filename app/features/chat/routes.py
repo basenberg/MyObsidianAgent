@@ -147,7 +147,10 @@ async def chat_completions(
 
     user_prompt = extract_user_prompt(request.messages)
     history = to_pydantic_history(request.messages)
-    deps = AgentDependencies(request_id=get_request_id())
+    deps = AgentDependencies(
+        request_id=get_request_id(),
+        vault_path=get_settings().vault_path,
+    )
 
     if request.stream:
         return StreamingResponse(

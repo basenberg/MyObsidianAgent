@@ -17,6 +17,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 
+import app.core.agent.tool_registry as _tool_registry  # noqa: F401  # pyright: ignore[reportUnusedImport]
 from app.core.config import get_settings
 from app.core.database import engine
 from app.core.exceptions import setup_exception_handlers

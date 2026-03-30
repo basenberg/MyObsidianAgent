@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-
 _STREAM_HEADERS = {"Authorization": "Bearer test-bearer-token"}
 _STREAM_PAYLOAD = {"messages": [{"role": "user", "content": "Say hello"}], "stream": True}
 
@@ -24,7 +23,9 @@ async def _mock_iter_empty(*args, **kwargs):  # type: ignore[no-untyped-def]
 def test_streaming_returns_event_stream_content_type(app_client: TestClient) -> None:
     """Verify Content-Type is text/event-stream when stream=True."""
     with patch("app.features.chat.routes.vault_agent.iter", new=_mock_iter_empty):
-        with app_client.stream("POST", "/v1/chat/completions", json=_STREAM_PAYLOAD, headers=_STREAM_HEADERS) as response:
+        with app_client.stream(
+            "POST", "/v1/chat/completions", json=_STREAM_PAYLOAD, headers=_STREAM_HEADERS
+        ) as response:
             assert response.status_code == 200
             assert "text/event-stream" in response.headers.get("content-type", "")
 
@@ -33,7 +34,9 @@ def test_streaming_returns_event_stream_content_type(app_client: TestClient) -> 
 def test_streaming_response_contains_done_terminator(app_client: TestClient) -> None:
     """Verify response body ends with data: [DONE] terminator."""
     with patch("app.features.chat.routes.vault_agent.iter", new=_mock_iter_empty):
-        with app_client.stream("POST", "/v1/chat/completions", json=_STREAM_PAYLOAD, headers=_STREAM_HEADERS) as response:
+        with app_client.stream(
+            "POST", "/v1/chat/completions", json=_STREAM_PAYLOAD, headers=_STREAM_HEADERS
+        ) as response:
             body = response.read().decode()
     assert "data: [DONE]" in body
 
@@ -42,14 +45,16 @@ def test_streaming_response_contains_done_terminator(app_client: TestClient) -> 
 def test_streaming_chunks_have_required_fields(app_client: TestClient) -> None:
     """Verify at least one SSE chunk has id, object, and choices[0].delta fields."""
     with patch("app.features.chat.routes.vault_agent.iter", new=_mock_iter_empty):
-        with app_client.stream("POST", "/v1/chat/completions", json=_STREAM_PAYLOAD, headers=_STREAM_HEADERS) as response:
+        with app_client.stream(
+            "POST", "/v1/chat/completions", json=_STREAM_PAYLOAD, headers=_STREAM_HEADERS
+        ) as response:
             body = response.read().decode()
 
     # Parse all data: lines that contain JSON
     chunks = []
     for line in body.splitlines():
         if line.startswith("data: ") and line != "data: [DONE]":
-            chunks.append(json.loads(line[len("data: "):]))
+            chunks.append(json.loads(line[len("data: ") :]))
 
     assert len(chunks) >= 1
     first = chunks[0]

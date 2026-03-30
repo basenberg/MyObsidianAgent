@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     # Database — optional, not required for agent-only deployments
     database_url: str = ""
 
+    # Vault — path to Obsidian vault directory (Docker: /vault, local: override via VAULT_PATH)
+    vault_path: str = "/vault"
+
     # CORS settings
     allowed_origins: list[str] = [
         "http://localhost:3000",
