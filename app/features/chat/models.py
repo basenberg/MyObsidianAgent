@@ -1,5 +1,7 @@
 """Pydantic models for OpenAI-compatible chat completion API."""
 
+from typing import Any
+
 from pydantic import BaseModel
 
 
@@ -8,11 +10,11 @@ class ChatMessage(BaseModel):
 
     Attributes:
         role: Sender role — 'user', 'assistant', or 'system'.
-        content: Message text content.
+        content: Message text content — str for plain text, list[Any] for multimodal.
     """
 
     role: str
-    content: str
+    content: str | list[Any]  # list[Any] for multimodal (image) messages
 
 
 class ChatRequest(BaseModel):
@@ -21,12 +23,16 @@ class ChatRequest(BaseModel):
     Attributes:
         model: Model identifier (ignored — vault_agent uses its configured model).
         messages: Full conversation history including the latest user message.
-        stream: Streaming flag (not supported in MVP — must be False).
+        stream: Streaming flag — True by default to match Obsidian Copilot default.
+        temperature: Sampling temperature (accepted, forwarded to model settings).
+        max_tokens: Maximum tokens to generate (accepted, forwarded to model settings).
     """
 
     model: str = "paddy"
     messages: list[ChatMessage]
-    stream: bool = False
+    stream: bool = True
+    temperature: float | None = None
+    max_tokens: int | None = None
 
 
 class ResponseMessage(BaseModel):

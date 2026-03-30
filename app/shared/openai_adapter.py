@@ -6,6 +6,7 @@ and wraps agent output in OpenAI chat completion response shape.
 
 import time
 import uuid
+from typing import Any, cast
 
 from pydantic_ai.messages import (
     ModelMessage,
@@ -18,21 +19,45 @@ from pydantic_ai.messages import (
 from app.features.chat.models import ChatMessage, ChatResponse, Choice, ResponseMessage, UsageInfo
 
 
+def _extract_text_from_content(content: str | list[Any]) -> str:
+    """Extract plain text string from str or multimodal list content.
+
+    Args:
+        content: Either a plain string or a multimodal list of content parts.
+
+    Returns:
+        The text string. For lists, returns the first text part's text value,
+        or empty string if no text part is found.
+    """
+    if isinstance(content, str):
+        return content
+    for part in content:
+        if isinstance(part, dict):
+            part_dict = cast(dict[str, Any], part)
+            if part_dict.get("type") == "text":
+                text = part_dict.get("text", "")
+                return text if isinstance(text, str) else ""
+    return ""
+
+
 def extract_user_prompt(messages: list[ChatMessage]) -> str:
-    """Return the content of the last user message.
+    """Return the content of the last user message as a plain string.
+
+    Handles both plain string content and multimodal list content
+    (e.g., when Obsidian Copilot attaches images).
 
     Args:
         messages: Full conversation history from the OpenAI request.
 
     Returns:
-        Content of the last user message.
+        Content of the last user message as a plain string.
 
     Raises:
         ValueError: If no user message exists in messages.
     """
     for msg in reversed(messages):
         if msg.role == "user":
-            return msg.content
+            return _extract_text_from_content(msg.content)
     raise ValueError("No user message found in messages list.")
 
 
@@ -54,9 +79,15 @@ def to_pydantic_history(messages: list[ChatMessage]) -> list[ModelMessage]:
     msgs = messages[:-1] if messages and messages[-1].role == "user" else messages
     for msg in msgs:
         if msg.role == "user":
-            history.append(ModelRequest(parts=[UserPromptPart(content=msg.content)]))
+            history.append(
+                ModelRequest(
+                    parts=[UserPromptPart(content=_extract_text_from_content(msg.content))]
+                )
+            )
         elif msg.role == "assistant":
-            history.append(ModelResponse(parts=[TextPart(content=msg.content)]))
+            history.append(
+                ModelResponse(parts=[TextPart(content=_extract_text_from_content(msg.content))])
+            )
     return history
 
 

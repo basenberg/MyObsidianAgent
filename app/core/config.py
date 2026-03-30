@@ -50,7 +50,13 @@ class Settings(BaseSettings):
     database_url: str = ""
 
     # CORS settings
-    allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:8123"]
+    allowed_origins: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "http://localhost:8123",
+        "app://obsidian.md",
+        "capacitor://localhost",
+    ]
 
 
 @lru_cache

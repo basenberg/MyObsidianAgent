@@ -41,7 +41,7 @@ def test_chat_returns_openai_format(app_client: TestClient) -> None:
         mock_run.return_value = mock_result
         response = app_client.post(
             "/v1/chat/completions",
-            json={"messages": [{"role": "user", "content": "Say hello"}]},
+            json={"messages": [{"role": "user", "content": "Say hello"}], "stream": False},
             headers={"Authorization": "Bearer test-bearer-token"},
         )
 
@@ -75,7 +75,8 @@ def test_chat_with_conversation_history(app_client: TestClient) -> None:
                     {"role": "user", "content": "First message"},
                     {"role": "assistant", "content": "First response"},
                     {"role": "user", "content": "Follow-up question"},
-                ]
+                ],
+                "stream": False,
             },
             headers={"Authorization": "Bearer test-bearer-token"},
         )
