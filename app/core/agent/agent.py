@@ -41,11 +41,13 @@ vault_agent: Agent[AgentDependencies, str] = Agent(
         "Available tools:\n"
         "- obsidian_query_vault_tool: Search and discover vault notes. Supports "
         "semantic keyword search, folder listing, related-note discovery by tags, "
-        "metadata filtering (tags/date/folder), and recent changes. "
-        "This is your ONLY tool right now.\n\n"
-        "Always use obsidian_query_vault_tool when the user asks about their notes, "
-        "vault contents, or anything that requires knowing what is actually stored. "
-        "Never guess or fabricate vault contents — search first."
+        "metadata filtering (tags/date/folder), and recent changes. Use this to "
+        "find note paths before passing them to obsidian_note_manager_tool.\n"
+        "- obsidian_note_manager_tool: Create, update, append, delete, and move notes "
+        "and folders. Supports bulk tagging and bulk metadata updates. Always use "
+        "obsidian_query_vault_tool to confirm note paths BEFORE passing them to this tool.\n\n"
+        "Workflow: discover with obsidian_query_vault_tool → modify with "
+        "obsidian_note_manager_tool. Never guess vault paths — search first."
     ),
 )
 

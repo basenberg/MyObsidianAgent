@@ -8,6 +8,7 @@ Design: pure pathlib, stdlib only, fully type-annotated, errors are actionable s
 
 from __future__ import annotations
 
+import shutil
 import time
 from pathlib import Path
 from typing import Any
@@ -305,6 +306,181 @@ class VaultManager:
             return str(path)
 
     # -------------------------------------------------------------------------
+    # Write operations
+    # -------------------------------------------------------------------------
+
+    def write_note(self, relative_path: str, content: str, overwrite: bool = False) -> Path:
+        """Create or replace a markdown note in the vault.
+
+        Args:
+            relative_path: Vault-relative path including filename (e.g., "Projects/Alpha.md").
+            content: Full text content to write.
+            overwrite: If False (default), raises ValueError if the note already exists.
+
+        Returns:
+            Absolute Path to the created or updated note.
+
+        Raises:
+            ValueError: If note exists and overwrite=False.
+        """
+        target = self._root / relative_path
+        if target.exists() and not overwrite:
+            raise ValueError(
+                f"Note already exists at '{relative_path}'. "
+                f"Use operation='update_note' to replace it, or set overwrite=True."
+            )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+        return target
+
+    def delete_note(self, relative_path: str) -> Path:
+        """Delete a markdown note from the vault.
+
+        The caller is responsible for validating confirm_destructive before calling this method.
+
+        Args:
+            relative_path: Vault-relative path to the note (e.g., "Projects/Alpha.md").
+
+        Returns:
+            Absolute Path of the deleted note.
+
+        Raises:
+            ValueError: If the note does not exist.
+        """
+        target = self._root / relative_path
+        if not target.exists():
+            raise ValueError(
+                f"Note not found at '{relative_path}'. "
+                f"Use obsidian_query_vault_tool to find available notes."
+            )
+        target.unlink()
+        return target
+
+    def move_path(self, source: str, destination: str) -> Path:
+        """Move a file or folder to a new location within the vault.
+
+        Args:
+            source: Vault-relative source path (file or folder).
+            destination: Vault-relative destination path. If destination is a directory,
+                the source is moved inside it. If destination is a full path, source is
+                renamed to it.
+
+        Returns:
+            Absolute Path of the moved item at its new location.
+
+        Raises:
+            ValueError: If source does not exist.
+        """
+        src = self._root / source
+        dst = self._root / destination
+        if not src.exists():
+            raise ValueError(
+                f"Source not found at '{source}'. "
+                f"Use obsidian_query_vault_tool to verify the path before moving."
+            )
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        result = shutil.move(str(src), str(dst))
+        return Path(result)
+
+    def create_folder(self, relative_path: str) -> Path:
+        """Create a folder (and any missing parent folders) in the vault.
+
+        Args:
+            relative_path: Vault-relative folder path to create (e.g., "Projects/2025/Q1").
+
+        Returns:
+            Absolute Path of the created folder.
+        """
+        target = self._root / relative_path
+        target.mkdir(parents=True, exist_ok=True)
+        return target
+
+    def delete_folder(self, relative_path: str, recursive: bool = False) -> Path:
+        """Delete a folder from the vault.
+
+        Args:
+            relative_path: Vault-relative path of the folder to delete.
+            recursive: If True, delete folder and all its contents (shutil.rmtree).
+                If False (default), raises ValueError if folder is non-empty.
+
+        Returns:
+            Absolute Path of the deleted folder.
+
+        Raises:
+            ValueError: If folder does not exist, is not a directory, or is non-empty
+                when recursive=False.
+        """
+        target = self._root / relative_path
+        if not target.exists():
+            raise ValueError(
+                f"Folder not found at '{relative_path}'. "
+                f"Use obsidian_query_vault_tool with query_type='list_structure' to browse folders."
+            )
+        if not target.is_dir():
+            raise ValueError(
+                f"Path '{relative_path}' is a file, not a folder. "
+                f"Use operation='delete_note' to delete a note."
+            )
+        if recursive:
+            shutil.rmtree(str(target))
+        else:
+            contents = list(target.iterdir())
+            if contents:
+                raise ValueError(
+                    f"Folder '{relative_path}' is not empty ({len(contents)} items). "
+                    f"Set recursive=True to delete the folder and all its contents."
+                )
+            target.rmdir()
+        return target
+
+    def update_frontmatter(self, relative_path: str, changes: dict[str, object]) -> Path:
+        """Merge changes into a note's YAML frontmatter, preserving the note body.
+
+        Reads the existing frontmatter (if any), merges the provided changes, and
+        rewrites the file with the updated frontmatter block. The note body (content
+        after the closing ---) is preserved unchanged.
+
+        For list values, the existing list is replaced (not appended).
+        For notes with no frontmatter, a new frontmatter block is prepended.
+
+        Args:
+            relative_path: Vault-relative path to the note.
+            changes: Key-value pairs to merge into frontmatter. Values may be strings,
+                numbers, booleans, or lists of strings.
+
+        Returns:
+            Absolute Path of the updated note.
+
+        Raises:
+            ValueError: If the note does not exist.
+        """
+        target = self._root / relative_path
+        if not target.exists():
+            raise ValueError(
+                f"Note not found at '{relative_path}'. "
+                f"Use obsidian_query_vault_tool to find available notes."
+            )
+
+        raw = target.read_text(encoding="utf-8")
+
+        # Split into frontmatter dict + body string
+        existing: dict[str, object] = {}
+        body: str = raw
+
+        if raw.startswith("---"):
+            end_idx = raw.find("\n---", 3)
+            if end_idx != -1:
+                existing = self.parse_frontmatter(target)
+                body = raw[end_idx + 4 :]  # skip the closing "\n---"
+                if body.startswith("\n"):
+                    body = body[1:]
+
+        merged = {**existing, **changes}
+        frontmatter_block = self._serialise_frontmatter(merged)
+        target.write_text(f"{frontmatter_block}\n{body}", encoding="utf-8")
+        return target
+
+    # -------------------------------------------------------------------------
     # Private helpers
     # -------------------------------------------------------------------------
 
@@ -330,3 +506,25 @@ class VaultManager:
         if end < len(content):
             excerpt = excerpt + "..."
         return excerpt[:200]
+
+    def _serialise_frontmatter(self, data: dict[str, object]) -> str:
+        """Serialise a flat dict to a YAML frontmatter block string.
+
+        Supports scalar values and lists of strings/scalars. Does not use PyYAML —
+        hand-rolled to match the flat Obsidian frontmatter format.
+
+        Args:
+            data: Key-value pairs to serialise.
+
+        Returns:
+            YAML frontmatter block including the opening and closing --- delimiters.
+        """
+        lines: list[str] = ["---"]
+        for key, value in data.items():
+            if isinstance(value, list):
+                items = ", ".join(str(v) for v in value)
+                lines.append(f"{key}: [{items}]")
+            else:
+                lines.append(f"{key}: {value}")
+        lines.append("---")
+        return "\n".join(lines)

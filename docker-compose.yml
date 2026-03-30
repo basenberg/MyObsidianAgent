@@ -32,7 +32,7 @@ services:
     volumes:
       - .:/app
       - /app/.venv  # Anonymous volume to preserve container's virtual environment
-      - ${VAULT_PATH:-/tmp/empty-vault}:/vault:ro  # Obsidian vault (set VAULT_PATH in .env)
+      - ${VAULT_PATH:-/tmp/empty-vault}:/vault:rw  # Obsidian vault (set VAULT_PATH in .env)
 
     # Environment variables
     # Load from .env file if present (create one if you need custom values)

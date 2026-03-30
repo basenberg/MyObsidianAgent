@@ -195,3 +195,155 @@ def test_get_note_path(vault_root: Path) -> None:
     vm = VaultManager(str(vault_root))
     result = vm.get_note_path("Projects/Alpha.md")
     assert result == vault_root / "Projects" / "Alpha.md"
+
+
+# ---------------------------------------------------------------------------
+# Write operation tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_write_note_creates_file(vault_root: Path) -> None:
+    vm = VaultManager(str(vault_root))
+    path = vm.write_note("NewNote.md", "# New Note\nHello world.")
+    assert path.exists()
+    assert path.read_text(encoding="utf-8") == "# New Note\nHello world."
+
+
+@pytest.mark.unit
+def test_write_note_creates_parent_dirs(vault_root: Path) -> None:
+    vm = VaultManager(str(vault_root))
+    path = vm.write_note("Deep/Nested/Note.md", "# Deep")
+    assert path.exists()
+    assert (vault_root / "Deep" / "Nested").is_dir()
+
+
+@pytest.mark.unit
+def test_write_note_overwrite_true_replaces_content(vault_root: Path) -> None:
+    vm = VaultManager(str(vault_root))
+    vm.write_note("Replace.md", "original")
+    vm.write_note("Replace.md", "replaced", overwrite=True)
+    assert (vault_root / "Replace.md").read_text(encoding="utf-8") == "replaced"
+
+
+@pytest.mark.unit
+def test_write_note_overwrite_false_raises(vault_root: Path) -> None:
+    vm = VaultManager(str(vault_root))
+    vm.write_note("Existing.md", "original")
+    with pytest.raises(ValueError, match="already exists"):
+        vm.write_note("Existing.md", "new content")
+
+
+@pytest.mark.unit
+def test_delete_note_removes_file(vault_root: Path) -> None:
+    vm = VaultManager(str(vault_root))
+    target = vault_root / "Projects" / "Alpha.md"
+    assert target.exists()
+    result = vm.delete_note("Projects/Alpha.md")
+    assert not target.exists()
+    assert result == target
+
+
+@pytest.mark.unit
+def test_delete_note_missing_raises(vault_root: Path) -> None:
+    vm = VaultManager(str(vault_root))
+    with pytest.raises(ValueError, match="not found"):
+        vm.delete_note("Projects/DoesNotExist.md")
+
+
+@pytest.mark.unit
+def test_move_path_moves_file(vault_root: Path) -> None:
+    vm = VaultManager(str(vault_root))
+    vm.move_path("Projects/Alpha.md", "Archive/Alpha.md")
+    assert not (vault_root / "Projects" / "Alpha.md").exists()
+    assert (vault_root / "Archive" / "Alpha.md").exists()
+
+
+@pytest.mark.unit
+def test_move_path_creates_parent_dirs(vault_root: Path) -> None:
+    vm = VaultManager(str(vault_root))
+    vm.move_path("README.md", "Deep/Path/README.md")
+    assert (vault_root / "Deep" / "Path" / "README.md").exists()
+
+
+@pytest.mark.unit
+def test_move_path_missing_source_raises(vault_root: Path) -> None:
+    vm = VaultManager(str(vault_root))
+    with pytest.raises(ValueError, match="Source not found"):
+        vm.move_path("NoSuchFile.md", "Somewhere/NoSuchFile.md")
+
+
+@pytest.mark.unit
+def test_create_folder_creates_nested(vault_root: Path) -> None:
+    vm = VaultManager(str(vault_root))
+    result = vm.create_folder("NewFolder/SubFolder")
+    assert result.is_dir()
+    assert (vault_root / "NewFolder" / "SubFolder").is_dir()
+
+
+@pytest.mark.unit
+def test_create_folder_idempotent(vault_root: Path) -> None:
+    vm = VaultManager(str(vault_root))
+    vm.create_folder("Projects")  # already exists — should not raise
+    assert (vault_root / "Projects").is_dir()
+
+
+@pytest.mark.unit
+def test_delete_folder_non_recursive_nonempty_raises(vault_root: Path) -> None:
+    vm = VaultManager(str(vault_root))
+    with pytest.raises(ValueError, match="not empty"):
+        vm.delete_folder("Projects")
+
+
+@pytest.mark.unit
+def test_delete_folder_recursive(vault_root: Path) -> None:
+    vm = VaultManager(str(vault_root))
+    vm.delete_folder("Projects", recursive=True)
+    assert not (vault_root / "Projects").exists()
+
+
+@pytest.mark.unit
+def test_delete_folder_empty_no_recursive(vault_root: Path) -> None:
+    vm = VaultManager(str(vault_root))
+    (vault_root / "EmptyFolder").mkdir()
+    vm.delete_folder("EmptyFolder")
+    assert not (vault_root / "EmptyFolder").exists()
+
+
+@pytest.mark.unit
+def test_delete_folder_missing_raises(vault_root: Path) -> None:
+    vm = VaultManager(str(vault_root))
+    with pytest.raises(ValueError, match="Folder not found"):
+        vm.delete_folder("DoesNotExist")
+
+
+@pytest.mark.unit
+def test_update_frontmatter_merges_keys(vault_root: Path) -> None:
+    vm = VaultManager(str(vault_root))
+    vm.update_frontmatter("Projects/Alpha.md", {"status": "reviewed"})
+    fm = vm.parse_frontmatter(vault_root / "Projects" / "Alpha.md")
+    assert fm.get("status") == "reviewed"
+    # Existing tags must be preserved
+    assert "project" in fm.get("tags", [])
+
+
+@pytest.mark.unit
+def test_update_frontmatter_preserves_body(vault_root: Path) -> None:
+    vm = VaultManager(str(vault_root))
+    vm.update_frontmatter("Projects/Alpha.md", {"status": "done"})
+    content = (vault_root / "Projects" / "Alpha.md").read_text(encoding="utf-8")
+    assert "Alpha Project" in content
+    assert "Machine learning experiment" in content
+
+
+@pytest.mark.unit
+def test_update_frontmatter_no_existing_frontmatter(vault_root: Path) -> None:
+    no_fm = vault_root / "plain.md"
+    no_fm.write_text("# Plain Note\nBody text here.", encoding="utf-8")
+    vm = VaultManager(str(vault_root))
+    vm.update_frontmatter("plain.md", {"tags": ["new"], "status": "active"})
+    fm = vm.parse_frontmatter(no_fm)
+    assert "status" in fm
+    # Body must still be present
+    content = no_fm.read_text(encoding="utf-8")
+    assert "Body text here" in content
