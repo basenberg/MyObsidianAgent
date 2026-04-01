@@ -9,14 +9,13 @@ To add a new tool:
     2. Decorate the tool function with @vault_agent.tool
     3. Add an import line below (with # noqa: F401)
 
-Registered tools (2):
+Registered tools (3):
     - obsidian_query_vault_tool: vault discovery and search (read-only)
     - obsidian_note_manager_tool: vault modification (create/update/delete/move/bulk)
+    - obsidian_get_context_tool: full note reading with metadata, backlinks, related notes
 """
 
 # Registered tools (import order = registration order):
+import app.features.obsidian_get_context.obsidian_get_context_tools  # pyright: ignore[reportUnusedImport]
 import app.features.obsidian_note_manager.obsidian_note_manager_tool  # pyright: ignore[reportUnusedImport]
 import app.features.obsidian_query_vault.obsidian_query_vault_tools  # noqa: F401  # pyright: ignore[reportUnusedImport]
-
-# Future tools — uncomment as implemented:
-# import app.features.obsidian_get_context.obsidian_get_context_tools

@@ -4,5 +4,8 @@
       "Bash(grep -o \"\"text\"\":\"\"[^\"\"]*@agent.tool[^\"\"]*\"\" C:Usersjbasenberg.claudeprojectsC--Users-jbasenberg-dynamous-community-MyObsidianAgentf1dd7a0a-3126-4c85-974a-5927d59b8e3ctool-resultsbm987omo0.txt)",
       "Bash(uv run:*)"
     ]
+  },
+  "env": {
+    "PYRIGHT_PYTHON_FORCE_VERSION": "latest"
   }
 }
