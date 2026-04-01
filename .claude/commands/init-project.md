@@ -35,15 +35,15 @@ uv run alembic upgrade head
 ## 5. Start Development Server
 
 ```bash
-uv run uvicorn app.main:app --reload --port 8123
+uv run uvicorn app.main:app --reload --port 8000
 ```
 
-**Expected:** Server running on http://127.0.0.1:8123
+**Expected:** Server running on http://127.0.0.1:8000
 
 ## 6. Validate
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}" http://localhost:8123/health
+curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health
 ```
 
 **Expected:** `200`
@@ -51,5 +51,5 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8123/health
 ## 7. Summary
 
 Report the result of each step (pass/fail) and confirm the app is accessible at:
-- API: http://localhost:8123
-- Swagger UI: http://localhost:8123/docs
+- API: http://localhost:8000
+- Swagger UI: http://localhost:8000/docs
